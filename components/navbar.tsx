@@ -11,6 +11,7 @@ export default function Navbar() {
     "/": "Dashboard",
     "/employee": "Employee Database",
     "/reports": "Reports",
+    "/time": "Checkclock",
   };
 
   const title = titles[pathname] || "Admin Panel";

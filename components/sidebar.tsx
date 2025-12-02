@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 export default function Sidebar() {
   const pathname = usePathname();
 
-  const menu = [
+  const adminMenu = [
     { href: "/", icon: "mdi:view-dashboard" },
     { href: "/employee", icon: "mdi:account-group-outline" },
     { href: "/time", icon: "mdi:clock-outline" },
@@ -15,6 +15,15 @@ export default function Sidebar() {
     { href: "/documents", icon: "mdi:file-document-outline" },
 
   ];
+
+  const employeeMenu = [
+    { href: "/karyawan/dashboard", icon: "mdi:view-dashboard-outline" },
+    { href: "/karyawan/time", icon: "mdi:clock-time-four-outline" },
+  ];
+
+  const isEmployeePage = pathname.startsWith("/karyawan");
+  
+  const menu = isEmployeePage ? employeeMenu : adminMenu;
 
   return (
     <div className="h-screen w-16 bg-[#1E3A5F] flex flex-col items-center py-3 space-y-1">

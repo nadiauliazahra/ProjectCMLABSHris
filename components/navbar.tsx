@@ -6,6 +6,10 @@ import Image from "next/image";
 export default function Navbar() {
   const pathname = usePathname();
 
+    if (pathname.startsWith("/payment")) {
+  return null;
+}
+
   // Mapping judul berdasarkan route
   const titles: Record<string, string> = {
     "/": "Dashboard",

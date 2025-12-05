@@ -6,6 +6,10 @@ import { usePathname } from "next/navigation";
 export default function Sidebar() {
   const pathname = usePathname();
 
+  if (pathname.startsWith("/payment")) {
+  return null;
+}
+
   const adminMenu = [
     { href: "/", icon: "mdi:view-dashboard" },
     { href: "/employee", icon: "mdi:account-group-outline" },

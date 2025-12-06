@@ -6,9 +6,15 @@ import { usePathname } from "next/navigation";
 export default function Sidebar() {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/payment")) {
-  return null;
-}
+  if (
+    pathname.startsWith("/payment") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/register") 
+  ) {
+    return null;
+  }
 
   const adminMenu = [
     { href: "/", icon: "mdi:view-dashboard" },

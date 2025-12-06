@@ -6,9 +6,15 @@ import Image from "next/image";
 export default function Navbar() {
   const pathname = usePathname();
 
-    if (pathname.startsWith("/payment")) {
-  return null;
-}
+  if (
+    pathname.startsWith("/payment") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/register") 
+  ) {
+    return null;
+  }
 
   // Mapping judul berdasarkan route
   const titles: Record<string, string> = {

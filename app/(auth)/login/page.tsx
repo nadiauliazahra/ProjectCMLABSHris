@@ -41,7 +41,7 @@ export default function LoginPage() {
       localStorage.setItem('user', JSON.stringify(user))
 
       if (user.role === 'admin_company' || user.role === 'admin_system') {
-        router.push('/')
+        router.push('/dashboard')
       } else {
         router.push('/karyawan/dashboard')
       }

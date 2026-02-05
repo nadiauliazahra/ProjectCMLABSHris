@@ -37,7 +37,7 @@ export default function Sidebar() {
 
   // --- MENU CONFIGURATION ---
   const adminMenu: MenuItem[] = [
-    { href: "/", icon: "mdi:view-dashboard" },
+    { href: "/dashboard/", icon: "mdi:view-dashboard" },
     { href: "/employee", icon: "mdi:account-group-outline" },
     { href: "/time", icon: "mdi:clock-outline" },
     { href: "/calendar", icon: "mdi:calendar-month-outline" },

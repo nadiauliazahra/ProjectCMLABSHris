@@ -142,7 +142,7 @@ export default function Navbar() {
 
   // Command Palette Items
   const commands = [
-    { name: "Dashboard", href: user?.role === 'user' ? "/karyawan/dashboard" : "/", icon: "mdi:view-dashboard", roles: ["all"] },
+    { name: "Dashboard", href: user?.role === 'user' ? "/karyawan/dashboard" : "/dashboard", icon: "mdi:view-dashboard", roles: ["all"] },
     { name: "Attendance", href: user?.role === 'user' ? "/karyawan/time" : "/time", icon: "mdi:clock-outline", roles: ["all"] },
     { name: "Employees", href: "/employee", icon: "mdi:account-group", roles: ["admin_company", "admin_system"] },
     { name: "Reports", href: "/reports", icon: "mdi:file-chart", roles: ["admin_company"] },

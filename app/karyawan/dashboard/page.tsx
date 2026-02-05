@@ -1,7 +1,9 @@
 "use client";
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Icon } from "@iconify/react";
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
+import { API_URL } from '../../../utils/config'; 
 import { 
   PieChart, Pie, Cell, 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
@@ -11,6 +13,8 @@ export default function EmployeeDashboard() {
   const router = useRouter();
 
   // --- STATE MANAGEMENT ---
+  const [loading, setLoading] = useState(true);
+  const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [activePieIndex, setActivePieIndex] = useState<number | null>(null);
   const [activeBarIndex, setActiveBarIndex] = useState<number | null>(null);
   
@@ -24,50 +28,141 @@ export default function EmployeeDashboard() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // --- MOCK DATA ---
+  // --- FETCH DATA ---
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            router.push('/login');
+            return;
+        }
 
-  // 1. Attendance Summary (Pie Chart)
-  const attendancePieData = [
-    { name: 'Present', value: 67, color: '#247046' },
-    { name: 'Permit', value: 15, color: '#FEAA00' }, 
-    { name: 'Leave', value: 10, color: '#C01005' },  
-    { name: 'Sick', value: 15, color: '#2D8DFE' },   
-  ];
+        // Fetch "My Attendance" (Limit 100 to calculate stats)
+        const response = await axios.get(`${API_URL}/attendance/my`, {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { limit: 100 } 
+        });
 
-  // 2. Work Hours (Bar Chart)
-  const workHoursData = [
-    { date: new Date(2025, 2, 20), hours: 8.5 },
-    { date: new Date(2025, 2, 21), hours: 4.2 },
-    { date: new Date(2025, 2, 22), hours: 6.5 },
-    { date: new Date(2025, 2, 23), hours: 5.5 },
-    { date: new Date(2025, 2, 24), hours: 9.0 },
-    { date: new Date(2025, 2, 25), hours: 7.5 },
-    { date: new Date(2025, 2, 26), hours: 3.0 },
-  ];
+        const data = response.data.rows || response.data.data || [];
+        setAttendanceData(data);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [router]);
+
+  // --- FILTER ENGINE (THE FIX) ---
+  const filteredData = useMemo(() => {
+    // If no dates selected, return all data
+    if (!startDate && !endDate) return attendanceData;
+
+    return attendanceData.filter(item => {
+        const itemDate = new Date(item.date).getTime();
+        const start = startDate ? new Date(startDate).getTime() : 0;
+        // Set end date to end of day (23:59:59) to ensure inclusion
+        const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : Infinity;
+
+        return itemDate >= start && itemDate <= end;
+    });
+  }, [attendanceData, startDate, endDate]);
+
+  // --- DATA PROCESSING ---
+  
+  // 1. Calculate Stats Cards (Using filteredData)
+  const stats = useMemo(() => {
+    let totalHours = 0;
+    let approved = 0;
+    let pending = 0;
+    let rejected = 0;
+    let leaveCount = 0;
+    let presentCount = 0;
+
+    filteredData.forEach(item => {
+        // Count Status
+        if (item.status_approve === 'approved') approved++;
+        if (item.status_approve === 'waiting') pending++;
+        if (item.status_approve === 'rejected') rejected++;
+
+        // Count Types
+        if (['annual_leave', 'sick_leave'].includes(item.type)) leaveCount++;
+        if (item.type === 'present') presentCount++;
+
+        // Calculate Work Hours
+        if (item.check_in && item.check_out) {
+            const start = new Date(item.check_in).getTime();
+            const end = new Date(item.check_out).getTime();
+            const hours = (end - start) / (1000 * 60 * 60);
+            if (hours > 0) totalHours += hours;
+        }
+    });
+
+    return { totalHours, approved, pending, rejected, leaveCount, presentCount };
+  }, [filteredData]);
+
+  // 2. Prepare Pie Chart Data
+  const attendancePieData = useMemo(() => [
+    { name: 'Present', value: stats.presentCount, color: '#247046' },
+    { name: 'Leave', value: stats.leaveCount, color: '#C01005' },    
+  ], [stats]);
+
+  // 3. Prepare Bar Chart Data
+  const workHoursData = useMemo(() => {
+    const hoursByDate: Record<string, number> = {};
+    
+    filteredData.forEach(item => {
+        if (item.check_in && item.check_out && item.date) {
+            const dateKey = new Date(item.date).toISOString().split('T')[0];
+            const start = new Date(item.check_in).getTime();
+            const end = new Date(item.check_out).getTime();
+            const hours = (end - start) / (1000 * 60 * 60);
+            
+            if (hours > 0) {
+                hoursByDate[dateKey] = (hoursByDate[dateKey] || 0) + hours;
+            }
+        }
+    });
+
+    // Convert to Array & Sort
+    const chartData = Object.keys(hoursByDate).sort().map(dateStr => ({
+        date: new Date(dateStr),
+        hours: parseFloat(hoursByDate[dateStr].toFixed(1))
+    }));
+
+    // Logic: If Filter is active, show ALL days in filter. 
+    // If NO filter, just show last 7 days (Dashboard default).
+    if (startDate || endDate) {
+        return chartData;
+    }
+    return chartData.slice(-7);
+
+  }, [filteredData, startDate, endDate]);
+
 
   // --- FORMATTERS ---
-  
-  // Formatter for X-Axis (e.g., "Mar 20")
   const formatXAxis = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
   };
 
-  // Formatter for Tooltip (e.g., "March 20, 2025")
   const formatTooltip = (date: Date) => {
     return new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(date);
   };
 
   // --- HANDLERS ---
-
   const clearFilters = () => {
     setStartDate('');
     setEndDate('');
   };
 
   const handleNavigate = (path: string) => {
-    console.log(`Navigating to ${path}`);
     router.push(path); 
   };
+
+  if (loading) return <div className="p-10 text-center text-gray-500">Loading Dashboard...</div>;
 
   return (
     <div className="flex-1 bg-[#F3F5F6] min-h-screen font-sans p-6 overflow-x-hidden">
@@ -79,17 +174,16 @@ export default function EmployeeDashboard() {
         <div className="relative z-50">
             <button 
                 onClick={() => setShowDateFilter(!showDateFilter)}
-                className="flex items-center gap-2 bg-white border border-[#D8DDE1] px-4 py-2 rounded-lg text-sm text-[#596171] shadow-sm hover:bg-gray-50 transition-colors"
+                className={`flex items-center gap-2 bg-white border px-4 py-2 rounded-lg text-sm shadow-sm hover:bg-gray-50 transition-colors ${startDate || endDate ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-[#D8DDE1] text-[#596171]'}`}
             >
                 <Icon icon="mdi:calendar-range" className="text-lg" />
-                <span>Pilih Rentang Tanggal</span>
+                <span>{startDate ? `${startDate} - ${endDate || 'Now'}` : "Pilih Rentang Tanggal"}</span>
                 <Icon icon="mdi:chevron-down" className={`text-lg transition-transform ${showDateFilter ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Dropdown Content */}
             {showDateFilter && (
                 <div className="absolute top-full left-0 mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-xl p-4 animate-in fade-in zoom-in duration-200">
-                    {/* Date Range Inputs */}
                     <div className="mb-4">
                         <label className="block text-sm font-semibold mb-2 text-[#1D395E]">Date Range</label>
                         <div className="flex gap-2 items-center">
@@ -108,21 +202,13 @@ export default function EmployeeDashboard() {
                             />
                         </div>
                     </div>
-
-                    {/* Buttons */}
                     <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                        <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-black underline">
-                            Reset
-                        </button>
-                        <button onClick={() => setShowDateFilter(false)} className="bg-[#1E3A5F] text-white px-4 py-1.5 rounded text-xs hover:bg-[#2b4c75] transition-colors">
-                            Apply
-                        </button>
+                        <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-black underline">Reset</button>
+                        <button onClick={() => setShowDateFilter(false)} className="bg-[#1E3A5F] text-white px-4 py-1.5 rounded text-xs hover:bg-[#2b4c75] transition-colors">Apply</button>
                     </div>
                 </div>
             )}
         </div>
-
-        <div></div>
       </div>
 
       {/* --- TOP STATS CARDS --- */}
@@ -135,40 +221,40 @@ export default function EmployeeDashboard() {
                     Work Hours
                 </div>
             </div>
-            <p className="text-4xl font-bold text-black">20</p>
+            <p className="text-4xl font-bold text-black">{Math.floor(stats.totalHours)}h</p>
         </div>
 
-        {/* On Time */}
+        {/* Attendance Approved */}
         <div className="bg-white p-5 rounded-xl border border-[#D8DDE1] shadow-sm hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-black">
                     <Icon icon="mdi:checkbox-marked-circle-outline" className="text-black text-lg" />
-                    On Time
+                    Attendance Approved
                 </div>
             </div>
-            <p className="text-4xl font-bold text-black">12</p>
+            <p className="text-4xl font-bold text-black">{stats.approved}</p>
         </div>
 
-        {/* Late */}
+        {/* Pending */}
         <div className="bg-white p-5 rounded-xl border border-[#D8DDE1] shadow-sm hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-black">
                     <Icon icon="mdi:alert-circle" className="text-[#14AE5C] text-lg" />
-                    Late
+                    Attendance Pending
                 </div>
             </div>
-            <p className="text-4xl font-bold text-black">15</p>
+            <p className="text-4xl font-bold text-black">{stats.pending}</p>
         </div>
 
-        {/* Absent */}
+        {/* Rejected */}
         <div className="bg-white p-5 rounded-xl border border-[#D8DDE1] shadow-sm hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2 text-sm font-medium text-black">
                     <Icon icon="mdi:close-circle" className="text-[#C11106] text-lg" />
-                    Absent
+                    Attendance Rejected
                 </div>
             </div>
-            <p className="text-4xl font-bold text-black">5</p>
+            <p className="text-4xl font-bold text-black">{stats.rejected}</p>
         </div>
       </div>
 
@@ -177,21 +263,15 @@ export default function EmployeeDashboard() {
         
         {/* Attendance Summary (Pie Chart) */}
         <div className="bg-white rounded-xl border border-[#D8DDE1] shadow-sm h-[400px] flex flex-col p-6">
-            {/* Header with Dropdown */}
             <div className="flex justify-between items-center mb-4 relative z-40">
                 <h3 className="text-xl font-bold text-black">Attendance Summary</h3>
                 <div className="relative">
-                    <button 
-                        onClick={() => setShowMonthFilter(!showMonthFilter)}
-                        className="flex items-center gap-1 text-xs text-[#596171] border border-[#D8DDE1] px-2 py-1 rounded hover:bg-gray-50"
-                    >
+                    <button onClick={() => setShowMonthFilter(!showMonthFilter)} className="flex items-center gap-1 text-xs text-[#596171] border border-[#D8DDE1] px-2 py-1 rounded hover:bg-gray-50">
                         Select Month <Icon icon="mdi:chevron-down" className={`transition-transform ${showMonthFilter ? 'rotate-180' : ''}`}/>
                     </button>
                     {showMonthFilter && (
                         <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 shadow-lg rounded p-2 w-32 z-50">
-                            <div className="text-xs p-1 hover:bg-gray-100 cursor-pointer rounded text-black">January</div>
-                            <div className="text-xs p-1 hover:bg-gray-100 cursor-pointer rounded text-black">February</div>
-                            <div className="text-xs p-1 hover:bg-gray-100 cursor-pointer rounded text-black">March</div>
+                            <div className="text-xs p-1 hover:bg-gray-100 cursor-pointer rounded text-black">Current Month</div>
                         </div>
                     )}
                 </div>
@@ -199,16 +279,15 @@ export default function EmployeeDashboard() {
             
             <div className="border-b border-[#D8DDE1] mb-4"></div>
 
-            {/* Content Area */}
             <div className="flex-1 relative flex flex-col justify-center items-center">
                 <div className="relative w-full h-full">
                     {/* Centered Dynamic Text */}
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-0 pointer-events-none">
                         <p className="text-4xl font-bold text-black transition-all duration-300">
-                            {activePieIndex !== null ? attendancePieData[activePieIndex].value : "67"}
+                            {activePieIndex !== null ? attendancePieData[activePieIndex].value : stats.presentCount}
                         </p>
                         <p className="text-sm font-bold text-black transition-all duration-300">
-                            {activePieIndex !== null ? attendancePieData[activePieIndex].name : "Attendance"}
+                            {activePieIndex !== null ? attendancePieData[activePieIndex].name : "Present"}
                         </p>
                     </div>
 
@@ -242,12 +321,7 @@ export default function EmployeeDashboard() {
                 {/* Legend */}
                 <div className="flex flex-wrap justify-center gap-4 mt-2">
                     {attendancePieData.map((item, index) => (
-                        <div 
-                            key={item.name} 
-                            className={`flex items-center gap-2 transition-opacity duration-300 ${
-                                activePieIndex !== null && activePieIndex !== index ? 'opacity-40' : 'opacity-100'
-                            }`}
-                        >
+                        <div key={item.name} className={`flex items-center gap-2 transition-opacity duration-300 ${activePieIndex !== null && activePieIndex !== index ? 'opacity-40' : 'opacity-100'}`}>
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
                             <span className="text-sm font-medium text-black">{item.name}</span>
                         </div>
@@ -258,106 +332,37 @@ export default function EmployeeDashboard() {
 
         {/* Leave Summary */}
         <div className="bg-white rounded-xl border border-[#D8DDE1] shadow-sm h-[400px] flex flex-col p-6">
-            {/* Header with Dropdown */}
             <div className="flex justify-between items-center mb-4 relative z-30">
                 <h3 className="text-xl font-bold text-black">Leave Summary</h3>
-                <div className="relative">
-                    <button 
-                        onClick={() => setShowTimeRangeFilter(!showTimeRangeFilter)}
-                        className="flex items-center gap-1 text-xs text-[#596171] border border-[#D8DDE1] px-2 py-1 rounded hover:bg-gray-50"
-                    >
-                        Rentang Waktu <Icon icon="mdi:chevron-down" className={`transition-transform ${showTimeRangeFilter ? 'rotate-180' : ''}`}/>
-                    </button>
-                    {showTimeRangeFilter && (
-                         <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 shadow-lg rounded p-2 w-32 z-50">
-                            <div className="text-xs p-1 hover:bg-gray-100 cursor-pointer rounded text-black">This Year</div>
-                            <div className="text-xs p-1 hover:bg-gray-100 cursor-pointer rounded text-black">Last Year</div>
-                        </div>
-                    )}
-                </div>
             </div>
 
             <div className="border-b border-[#D8DDE1] mb-6"></div>
 
-            {/* Content Area */}
-            <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2">
-                <div className="border border-[#D8DDE1] rounded-lg overflow-hidden">
-                    <div className="p-4 flex justify-between items-center">
-                         <div className="flex items-center gap-3">
-                            <div className="w-4 h-4 rounded-full bg-[#1D395E]"></div>
-                            <span className="font-medium text-black">Total Quota Annual Leave</span>
+                <div className="border border-[#D8DDE1] rounded-lg overflow-hidden flex flex-col justify-between">
+                    <div className="p-4">
+                         <div className="flex items-center gap-2 mb-2">
+                            <div className="w-4 h-4 rounded-full bg-[#B93B53]"></div>
+                            <span className="font-medium text-black">Leave Taken</span>
                          </div>
-                         <span className="text-xl font-medium text-black">12 Days</span>
+                         <span className="text-xl font-medium text-black">{stats.leaveCount} Days</span>
                     </div>
                     <div 
-                        onClick={() => handleNavigate('/leave')}
-                        className="bg-[#1D395E] px-4 py-2 flex justify-between items-center cursor-pointer hover:bg-[#2b4c75] transition-colors"
+                         onClick={() => handleNavigate('/karyawan/time')}
+                         className="bg-[#B93B53] px-4 py-2 flex justify-between items-center cursor-pointer hover:bg-[#a6344a] transition-colors"
                     >
                         <span className="text-xs font-medium text-white">Request Leave</span>
                         <Icon icon="mdi:arrow-right" className="text-white text-sm" />
                     </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="border border-[#D8DDE1] rounded-lg overflow-hidden flex flex-col justify-between">
-                        <div className="p-4">
-                             <div className="flex items-center gap-2 mb-2">
-                                <div className="w-4 h-4 rounded-full bg-[#7CA5BF]"></div>
-                                <span className="font-medium text-black">Taken</span>
-                             </div>
-                             <span className="text-xl font-medium text-black">4 Days</span>
-                        </div>
-                        <div 
-                            onClick={() => handleNavigate('/details')}
-                            className="bg-[#7CA5BF] px-4 py-2 flex justify-between items-center cursor-pointer hover:bg-[#6b94af] transition-colors"
-                        >
-                            <span className="text-xs font-medium text-white">See Details</span>
-                            <Icon icon="mdi:arrow-right" className="text-white text-sm" />
-                        </div>
-                    </div>
-
-                    <div className="border border-[#D8DDE1] rounded-lg overflow-hidden flex flex-col justify-between">
-                        <div className="p-4">
-                             <div className="flex items-center gap-2 mb-2">
-                                <div className="w-4 h-4 rounded-full bg-[#B93B53]"></div>
-                                <span className="font-medium text-black">Remaining</span>
-                             </div>
-                             <span className="text-xl font-medium text-black">8 Days</span>
-                        </div>
-                        <div 
-                             onClick={() => handleNavigate('/leave')}
-                             className="bg-[#B93B53] px-4 py-2 flex justify-between items-center cursor-pointer hover:bg-[#a6344a] transition-colors"
-                        >
-                            <span className="text-xs font-medium text-white">Request Leave</span>
-                            <Icon icon="mdi:arrow-right" className="text-white text-sm" />
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
-      </div>
 
       {/* --- Work Hours Chart --- */}
       <div className="bg-white rounded-xl border border-[#D8DDE1] shadow-sm p-6 relative z-10">
         <div className="flex justify-between items-start mb-4">
             <div>
                 <h3 className="text-lg font-medium text-[#595959]">Your Work Hours</h3>
-                <p className="text-2xl font-bold text-black mt-1">120h 54m</p>
-            </div>
-            <div className="relative">
-                <button 
-                    onClick={() => setShowWeekFilter(!showWeekFilter)}
-                    className="flex items-center gap-1 text-xs text-[#596171] border border-[#D8DDE1] px-2 py-1 rounded hover:bg-gray-50"
-                >
-                    View By Week <Icon icon="mdi:chevron-down" className={`transition-transform ${showWeekFilter ? 'rotate-180' : ''}`}/>
-                </button>
-                {showWeekFilter && (
-                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 shadow-lg rounded p-2 w-32 z-50">
-                        <div className="text-xs p-1 hover:bg-gray-100 cursor-pointer rounded text-black">Week 1</div>
-                        <div className="text-xs p-1 hover:bg-gray-100 cursor-pointer rounded text-black">Week 2</div>
-                        <div className="text-xs p-1 hover:bg-gray-100 cursor-pointer rounded text-black">Week 3</div>
-                    </div>
-                )}
+                <p className="text-2xl font-bold text-black mt-1">{stats.totalHours.toFixed(1)}h</p>
             </div>
         </div>
 
@@ -371,7 +376,6 @@ export default function EmployeeDashboard() {
                     barSize={40} 
                     margin={{ top: 10, right: 0, left: -20, bottom: 0 }}
                 >
-                    {/* CHANGED: stroke color to darker gray (#9CA3AF) */}
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#9CA3AF" />
                     <XAxis 
                         dataKey="date" 
@@ -379,7 +383,7 @@ export default function EmployeeDashboard() {
                         tickLine={false} 
                         tick={{ fontSize: 12, fill: '#000' }} 
                         dy={10}
-                        tickFormatter={formatXAxis} // UPDATED: Displays "Mar 20"
+                        tickFormatter={formatXAxis} 
                     />
                     <YAxis 
                         axisLine={false} 
@@ -390,7 +394,6 @@ export default function EmployeeDashboard() {
                     />
                     <Tooltip 
                         cursor={{ fill: 'transparent' }}
-                        // UPDATED: Displays "March 20, 2025" in title
                         labelFormatter={formatTooltip}
                         contentStyle={{ 
                             borderRadius: '8px', 

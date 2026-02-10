@@ -396,7 +396,6 @@ export default function TimePage() {
                             <div>
                                 <label className="block text-lg font-medium text-black mb-2">Date</label>
                                 <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                                    <div className="bg-[#F3F5F6] px-3 py-2 border-r border-gray-300 flex items-center justify-center"><Icon icon="mdi:calendar-blank" className="text-gray-600 text-xl" /></div>
                                     <input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="w-full p-3 text-gray-700 bg-white focus:outline-none" />
                                 </div>
                             </div>

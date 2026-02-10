@@ -171,7 +171,7 @@ export default function EmployeeDashboard() {
       <div className="flex flex-col md:flex-row justify-between items-center mb-8">
         
         {/* Date Filter Dropdown */}
-        <div className="relative z-50">
+        <div className="relative z-10">
             <button 
                 onClick={() => setShowDateFilter(!showDateFilter)}
                 className={`flex items-center gap-2 bg-white border px-4 py-2 rounded-lg text-sm shadow-sm hover:bg-gray-50 transition-colors ${startDate || endDate ? 'border-[#1E3A5F] text-[#1E3A5F]' : 'border-[#D8DDE1] text-[#596171]'}`}
@@ -263,14 +263,14 @@ export default function EmployeeDashboard() {
         
         {/* Attendance Summary (Pie Chart) */}
         <div className="bg-white rounded-xl border border-[#D8DDE1] shadow-sm h-[400px] flex flex-col p-6">
-            <div className="flex justify-between items-center mb-4 relative z-40">
+            <div className="flex justify-between items-center mb-4 relative z-10">
                 <h3 className="text-xl font-bold text-black">Attendance Summary</h3>
                 <div className="relative">
                     <button onClick={() => setShowMonthFilter(!showMonthFilter)} className="flex items-center gap-1 text-xs text-[#596171] border border-[#D8DDE1] px-2 py-1 rounded hover:bg-gray-50">
                         Select Month <Icon icon="mdi:chevron-down" className={`transition-transform ${showMonthFilter ? 'rotate-180' : ''}`}/>
                     </button>
                     {showMonthFilter && (
-                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 shadow-lg rounded p-2 w-32 z-50">
+                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 shadow-lg rounded p-2 w-32 z-10">
                             <div className="text-xs p-1 hover:bg-gray-100 cursor-pointer rounded text-black">Current Month</div>
                         </div>
                     )}
@@ -332,7 +332,7 @@ export default function EmployeeDashboard() {
 
         {/* Leave Summary */}
         <div className="bg-white rounded-xl border border-[#D8DDE1] shadow-sm h-[400px] flex flex-col p-6">
-            <div className="flex justify-between items-center mb-4 relative z-30">
+            <div className="flex justify-between items-center mb-4 relative z-10">
                 <h3 className="text-xl font-bold text-black">Leave Summary</h3>
             </div>
 

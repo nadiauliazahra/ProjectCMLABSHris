@@ -124,8 +124,6 @@ export default function Sidebar() {
     { href: "/employee", icon: "mdi:account-group-outline" },
     { href: "/time", icon: "mdi:clock-outline" },
     { href: "/calendar", icon: "mdi:calendar-month-outline" },
-    { href: "/reports", icon: "mdi:clipboard-text-outline" },
-    { href: "/documents", icon: "mdi:file-document-outline" },
   ];
 
   const employeeMenu: MenuItem[] = [

@@ -131,6 +131,7 @@ export default function Sidebar() {
   const employeeMenu: MenuItem[] = [
     { href: "/karyawan/dashboard", icon: "mdi:view-dashboard-outline" },
     { href: "/karyawan/time", icon: "mdi:clock-time-four-outline" },
+    { href: "/karyawan/calendar", icon: "mdi:calendar-month-outline" },
   ];
 
   const isEmployeePage = pathname.startsWith("/karyawan");
